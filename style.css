@@ -98,3 +98,38 @@ body.horror #message,
 body.horror p {
   color: #9f9491;
 }
+
+#gameWrapper {
+  position: relative;
+  width: 960px;
+  max-width: 95vw;
+}
+
+#gameContainer {
+  position: relative;
+  z-index: 1;
+}
+
+#glitchOverlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  z-index: 5000;
+
+  opacity: 0;
+  visibility: hidden;
+  mix-blend-mode: screen;
+  filter: contrast(1.2) saturate(0.7) brightness(0.9);
+
+  transition: opacity 0.25s ease, visibility 0s linear 0.25s;
+}
+
+#glitchOverlay.active {
+  opacity: 0.18;
+  visibility: visible;
+  transition: opacity 0.25s ease;
+}

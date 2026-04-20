@@ -26,8 +26,6 @@ const board = {
   slotWallBounce: 0.7
 };
 
-let horrorLevel = 0;
-
 const theme = {
   bg: [17, 24, 39],
   bgHorror: [13, 16, 20],
@@ -62,13 +60,28 @@ const theme = {
 
 const JUMPSCARE_THRESHOLD = 8102;
 const JUMPSCARE_PENALTY = 624;
+const FADE_THRESHOLD_1 = 6530;
+const FADE_THRESHOLD_2 = 4420;
 
 let jumpscareTriggered = false;
 let jumpscareActive = false;
 let jumpscareArmed = false;
+let horrorLevel = 0;
+let payoutCorrupted = false;
+
+let glitchStarted = false;
+let glitchUnlocked = false;
+let glitchPlaying = false;
+let nextRandomGlitchAt = Infinity;
+
+const RANDOM_GLITCH_MIN_DELAY = 8000;
+const RANDOM_GLITCH_MAX_DELAY = 18000;
+const RANDOM_GLITCH_CHANCE_PER_FRAME = 0.003;
 
 const scareFlags = {
-  firstThresholdSeen: false
+  firstThresholdSeen: false,
+  fadeThresholdOneSeen: false,
+  fadeThresholdTwoSeen: false
 };
 
 const multipliers = [
@@ -97,8 +110,10 @@ function setup() {
 }
 
 function draw() {
-  background(currentThemeColor("bg"));
+  tryRandomGlitch();
 
+  background(currentThemeColor("bg"));
+  
   updateBall();
   drawSlots();
   drawWalls();
@@ -147,6 +162,16 @@ function setupBoard() {
   }
 }
 
+function getDisplayedMultiplier(originalMultiplier) {
+  if (!payoutCorrupted) return originalMultiplier;
+
+  if (originalMultiplier === 5) return 3;
+  if (originalMultiplier === 4) return 2;
+  if (originalMultiplier === 2) return 1.75;
+
+  return originalMultiplier;
+}
+
 function drawSlotWalls() {
   const wallTop = board.bottomY - board.slotWallHeight;
   const wallBottom = board.bottomY;
@@ -175,7 +200,8 @@ function drawSlots() {
   strokeWeight(2);
 
   for (let slot of slots) {
-    const c = getSlotColor(slot.multiplier);
+    const displayedMultiplier = getDisplayedMultiplier(slot.multiplier);
+    const c = getSlotColor(displayedMultiplier);
 
     fill(red(c), green(c), blue(c), 60);
     stroke(c);
@@ -195,7 +221,7 @@ function drawSlots() {
       board.sinkLineY + (board.bottomY - board.sinkLineY) / 2;
 
     text(
-      `${slot.multiplier}x`,
+      `${displayedMultiplier}x`,
       slot.x + slot.width / 2,
       centerY
     );
@@ -384,7 +410,8 @@ function settleBall() {
     }
   }
 
-  const winnings = Math.round(COST_PER_BALL * landedSlot.multiplier);
+  const actualMultiplier = getDisplayedMultiplier(landedSlot.multiplier);
+  const winnings = Math.round(COST_PER_BALL * actualMultiplier);
   bankroll += winnings;
 
   evaluateScareThresholds();
@@ -394,11 +421,11 @@ function settleBall() {
 
   if (winnings > 0) {
     setMessage(
-      `Ball landed in ${landedSlot.multiplier}x. Won $${winnings}.`
+      `Ball landed in ${actualMultiplier}x. Won $${winnings}.`
     );
   } else {
     setMessage(
-      `Ball landed in ${landedSlot.multiplier}x. Lost the drop.`
+      `Ball landed in ${actualMultiplier}x. Lost the drop.`
     );
   }
 
@@ -503,12 +530,77 @@ function evaluateScareThresholds() {
     jumpscareArmed = true;
   }
 
-  // Future threshold examples:
-  // if (!scareFlags.secondThresholdSeen && bankroll <= 7000) {
-  //   scareFlags.secondThresholdSeen = true;
-  // }
+  if (!scareFlags.fadeThresholdOneSeen && bankroll <= FADE_THRESHOLD_1) {
+    scareFlags.fadeThresholdOneSeen = true;
+    horrorLevel = max(horrorLevel, 0.45);
+    startGlitchEffect();
+  }
+
+  if (!scareFlags.fadeThresholdTwoSeen && bankroll <= FADE_THRESHOLD_2) {
+    scareFlags.fadeThresholdTwoSeen = true;
+    horrorLevel = max(horrorLevel, 0.1);
+    document.body.classList.add("horror");
+  }
 }
 
 function currentThemeColor(key) {
   return blendColorPair(theme[key], theme[key + "Horror"], horrorLevel);
+}
+
+function scheduleNextRandomGlitch() {
+  nextRandomGlitchAt = millis() + random(RANDOM_GLITCH_MIN_DELAY, RANDOM_GLITCH_MAX_DELAY);
+}
+
+function tryRandomGlitch() {
+  if (!glitchUnlocked) return;
+  if (glitchPlaying) return;
+  if (jumpscareActive) return;
+  if (millis() < nextRandomGlitchAt) return;
+
+  if (random() < RANDOM_GLITCH_CHANCE_PER_FRAME) {
+    startGlitchEffect(true);
+  }
+}
+
+function startGlitchEffect(isRandomReplay = false) {
+  const glitchVideo = document.getElementById("glitchOverlay");
+  if (!glitchVideo) return;
+  if (glitchPlaying) return;
+
+  // First-ever unlock
+  glitchStarted = true;
+  glitchUnlocked = true;
+  glitchPlaying = true;
+
+  if (!isRandomReplay) {
+    payoutCorrupted = true;
+  }
+
+  glitchVideo.style.filter = "contrast(1.2) saturate(0.7) brightness(0.9)";
+  glitchVideo.classList.add("active");
+  glitchVideo.currentTime = 0;
+  glitchVideo.play().catch(() => {});
+
+  // Play only the first 1.5 seconds of the clip
+  setTimeout(() => {
+    glitchVideo.pause();
+  }, 1500);
+
+  // Keep the frozen overlay visible for the rest of the effect
+  setTimeout(() => {
+    glitchVideo.classList.remove("active");
+    glitchPlaying = false;
+
+    if (glitchUnlocked) {
+      scheduleNextRandomGlitch();
+    }
+  }, 4000);
+}
+
+function stopGlitchEffect() {
+  const glitchVideo = document.getElementById("glitchOverlay");
+  if (!glitchVideo) return;
+
+  glitchVideo.pause();
+  glitchVideo.classList.remove("active");
 }
