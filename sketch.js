@@ -33,6 +33,13 @@ const multipliers = [
   0.25, 0.5, 0.75, 1, 1.5, 2, 4, 5
 ];
 
+// Larger weights = wider slots
+const slotWeights = [
+  0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.45, 1.6,
+  1.75,
+  1.6, 1.45, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7
+];
+
 let pegs = [];
 let slots = [];
 let ball = null;
@@ -60,17 +67,25 @@ function setupBoard() {
   pegs = [];
   slots = [];
 
-  const slotWidth = (board.width - board.marginX * 2) / board.slotCount;
-  const centerX = board.width / 2;
+  const totalWidth = board.width - board.marginX * 2;
+  const totalWeight = slotWeights.reduce((sum, w) => sum + w, 0);
+
+  let currentX = board.marginX;
 
   for (let i = 0; i < board.slotCount; i++) {
+    const slotWidth = totalWidth * (slotWeights[i] / totalWeight);
+
     slots.push({
-      x: board.marginX + i * slotWidth,
+      x: currentX,
       width: slotWidth,
       multiplier: multipliers[i],
       index: i
     });
+
+    currentX += slotWidth;
   }
+
+  const centerX = board.width / 2;
 
   for (let row = 0; row < board.rows; row++) {
     const count = 10 + (row % 2);
@@ -88,15 +103,14 @@ function setupBoard() {
 }
 
 function drawSlotWalls() {
-  const slotWidth = (board.width - board.marginX * 2) / board.slotCount;
   const wallTop = board.bottomY - board.slotWallHeight;
   const wallBottom = board.bottomY;
 
   noStroke();
   fill(148, 163, 184);
 
-  for (let i = 1; i < board.slotCount; i++) {
-    const x = board.marginX + i * slotWidth;
+  for (let i = 1; i < slots.length; i++) {
+    const x = slots[i].x;
 
     rectMode(CENTER);
     rect(
@@ -113,7 +127,6 @@ function drawSlotWalls() {
 
 function drawSlots() {
   textAlign(CENTER, CENTER);
-  textSize(18);
   strokeWeight(2);
 
   for (let slot of slots) {
@@ -121,16 +134,26 @@ function drawSlots() {
 
     fill(red(c), green(c), blue(c), 60);
     stroke(c);
-    rect(slot.x + 2, board.sinkLineY, slot.width - 4, board.bottomY - board.sinkLineY);
+    rect(
+      slot.x + 2,
+      board.sinkLineY,
+      slot.width - 4,
+      board.bottomY - board.sinkLineY
+    );
 
     noStroke();
     fill(255);
-    text(`${slot.multiplier}x`, slot.x + slot.width / 2, board.sinkLineY + 20);
+    textStyle(BOLD);
+    textSize(max(10, slot.width * 0.28));
 
-    fill(203, 213, 225);
-    textSize(12);
-    text(`Zone ${slot.index + 1}`, slot.x + slot.width / 2, board.sinkLineY + 42);
-    textSize(18);
+    const centerY =
+      board.sinkLineY + (board.bottomY - board.sinkLineY) / 2;
+
+    text(
+      `${slot.multiplier}x`,
+      slot.x + slot.width / 2,
+      centerY
+    );
   }
 }
 
@@ -254,18 +277,16 @@ function updateBall() {
 function handleSlotWallCollisions() {
   if (!ball) return;
 
-  const slotWidth = (board.width - board.marginX * 2) / board.slotCount;
   const wallTop = board.bottomY - board.slotWallHeight;
   const wallBottom = board.bottomY;
   const halfThickness = board.slotWallThickness / 2;
 
-  // Only collide with divider walls when the ball is in the bottom slot area
   if (ball.y + board.ballRadius < wallTop || ball.y - board.ballRadius > wallBottom) {
     return;
   }
 
-  for (let i = 1; i < board.slotCount; i++) {
-    const wallX = board.marginX + i * slotWidth;
+  for (let i = 1; i < slots.length; i++) {
+    const wallX = slots[i].x;
 
     const overlapsHorizontally =
       ball.x + board.ballRadius > wallX - halfThickness &&
@@ -307,21 +328,29 @@ function handlePegCollision(peg) {
 }
 
 function settleBall() {
-  const slotWidth = (board.width - board.marginX * 2) / board.slotCount;
-  const relativeX = constrain(ball.x - board.marginX, 0, board.width - board.marginX * 2 - 1);
-  const slotIndex = floor(relativeX / slotWidth);
-  const slot = slots[slotIndex];
+  let landedSlot = slots[0];
 
-  const winnings = Math.round(COST_PER_BALL * slot.multiplier);
+  for (let slot of slots) {
+    if (ball.x >= slot.x && ball.x < slot.x + slot.width) {
+      landedSlot = slot;
+      break;
+    }
+  }
+
+  const winnings = Math.round(COST_PER_BALL * landedSlot.multiplier);
   bankroll += winnings;
 
   updateUI();
   setStatus("Pick a drop point");
 
   if (winnings > 0) {
-    setMessage(`Ball landed in Zone ${slot.index + 1} (${slot.multiplier}x). Won $${winnings}.`);
+    setMessage(
+      `Ball landed in ${landedSlot.multiplier}x. Won $${winnings}.`
+    );
   } else {
-    setMessage(`Ball landed in Zone ${slot.index + 1} (${slot.multiplier}x). Lost the drop.`);
+    setMessage(
+      `Ball landed in ${landedSlot.multiplier}x. Lost the drop.`
+    );
   }
 
   ball = null;
