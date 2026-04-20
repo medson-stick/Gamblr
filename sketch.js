@@ -1,175 +1,361 @@
-// ============================
-// SETTINGS (EDIT THESE)
-// ============================
+const COST_PER_BALL = 500;
+let bankroll = 10000;
+let ballActive = false;
 
-// Add your wheel options here
-let options = [
-  { label: "Slots"},
-  { label: "Plinko"},
-  { label: "RPS"},
-  { label: "Black Jack"},
-  { label: "Roulette"},
-  { label: "Poker"},
+const board = {
+  width: 960,
+  height: 760,
+  marginX: 60,
+  topDropY: 50,
+  topPegY: 120,
+  rows: 11,
+  pegSpacingX: 68,
+  pegSpacingY: 48,
+  pegRadius: 6,
+  ballRadius: 9,
+  gravity: 0.18,
+  friction: 0.999,
+  bounce: 0.78,
+  wallBounce: 0.75,
+  sinkLineY: 650,
+  bottomY: 708,
+  slotCount: 19,
+
+  slotWallHeight: 58,
+  slotWallThickness: 6,
+  slotWallBounce: 0.7
+};
+
+const multipliers = [
+  5, 4, 2, 1.5, 1, 0.75, 0.5, 0.25, 0.25,
+  0,
+  0.25,
+  0.25, 0.5, 0.75, 1, 1.5, 2, 4, 5
 ];
 
-// ============================
-// INTERNAL VARIABLES
-// ============================
-
-let angle = 0;            // Current rotation angle
-let spinning = false;     // Is the wheel spinning?
-let spinSpeed = 0;        // Current speed
-let friction = 0.98;      // Controls slowdown (closer to 1 = longer spin)
-
-let selectedIndex = -1;   // Final selected option
-
-let buttonRadius = 30;   // Radius of the spin button
-
-// ============================
-// SETUP
-// ============================
+let pegs = [];
+let slots = [];
+let ball = null;
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
-  angleMode(RADIANS);
-  textAlign(CENTER, CENTER);
+  const canvas = createCanvas(board.width, board.height);
+  canvas.parent("gameContainer");
+  setupBoard();
+  updateUI();
 }
-
-// ============================
-// DRAW LOOP
-// ============================
 
 function draw() {
-  background(240);
+  background(17, 24, 39);
 
-  translate(width / 2, height / 2);
+  updateBall();
+  drawSlots();
+  drawWalls();
+  drawSlotWalls();
+  drawDropArea();
+  drawPegs();
+  drawBall();
+}
 
-  drawBackSpinner();
-  drawWheel();
+function setupBoard() {
+  pegs = [];
+  slots = [];
 
-  // Handle spinning logic
-  if (spinning) {
-    angle += spinSpeed;
-    spinSpeed *= friction;
+  const slotWidth = (board.width - board.marginX * 2) / board.slotCount;
+  const centerX = board.width / 2;
 
-    // Stop when slow enough
-    if (spinSpeed < 0.002) {
-      spinning = false;
-      spinSpeed = 0;
-      determineWinner();
+  for (let i = 0; i < board.slotCount; i++) {
+    slots.push({
+      x: board.marginX + i * slotWidth,
+      width: slotWidth,
+      multiplier: multipliers[i],
+      index: i
+    });
+  }
+
+  for (let row = 0; row < board.rows; row++) {
+    const count = 10 + (row % 2);
+    const rowWidth = (count - 1) * board.pegSpacingX;
+    const startX = centerX - rowWidth / 2;
+    const y = board.topPegY + row * board.pegSpacingY;
+
+    for (let col = 0; col < count; col++) {
+      pegs.push({
+        x: startX + col * board.pegSpacingX,
+        y: y
+      });
     }
   }
-
-  drawPointer();
-  drawSpinButton();
 }
 
-// ============================
-// DRAW THE WHEEL
-// ============================
+function drawSlotWalls() {
+  const slotWidth = (board.width - board.marginX * 2) / board.slotCount;
+  const wallTop = board.bottomY - board.slotWallHeight;
+  const wallBottom = board.bottomY;
 
-function drawWheel() {
-  let sliceAngle = TWO_PI / options.length;
+  noStroke();
+  fill(148, 163, 184);
 
-  for (let i = 0; i < options.length; i++) {
-    let startAngle = angle + i * sliceAngle;
+  for (let i = 1; i < board.slotCount; i++) {
+    const x = board.marginX + i * slotWidth;
 
-    // Alternate colors
-    fill(i % 2 === 0 ? "#641530" : "#2B2B2B");
-
-    // Draw slice
-    arc(0, 0, 400, 400, startAngle, startAngle + sliceAngle, PIE);
-
-    // Draw text
-    push();
-    rotate(startAngle + sliceAngle / 2);
-    fill(0);
-    textSize(16);
-    text(options[i].label, 120, 0);
-    pop();
-  }
-}
-
-// ============================
-// DRAW POINTER (TOP MARKER)
-// ============================
-
-function drawPointer() {
-  fill(0);
-  triangle(-10, -210, 10, -210, 0, -180);
-}
-
-function drawBackSpinner(){
-    fill(0);
-    ellipse(0, 0, 410); 
-}
-
-// ============================
-// DRAW SPIN BUTTON
-// ============================
-
-function drawSpinButton() {
-  let d = dist(mouseX, mouseY, width / 2, height / 2);
-
-  // Hover effect
-  if (d < buttonRadius) {
-    fill("#ffcc00"); // lighter when hovered
-  } else {
-    fill("#FDB512");
+    rectMode(CENTER);
+    rect(
+      x,
+      (wallTop + wallBottom) / 2,
+      board.slotWallThickness,
+      board.slotWallHeight,
+      2
+    );
   }
 
-  // Draw circle button
-  ellipse(0, 0, buttonRadius * 2);
+  rectMode(CORNER);
+}
 
-  // Button text
-  fill(0);
+function drawSlots() {
+  textAlign(CENTER, CENTER);
   textSize(18);
-  text("SPIN", 0, 0);
+  strokeWeight(2);
+
+  for (let slot of slots) {
+    const c = getSlotColor(slot.multiplier);
+
+    fill(red(c), green(c), blue(c), 60);
+    stroke(c);
+    rect(slot.x + 2, board.sinkLineY, slot.width - 4, board.bottomY - board.sinkLineY);
+
+    noStroke();
+    fill(255);
+    text(`${slot.multiplier}x`, slot.x + slot.width / 2, board.sinkLineY + 20);
+
+    fill(203, 213, 225);
+    textSize(12);
+    text(`Zone ${slot.index + 1}`, slot.x + slot.width / 2, board.sinkLineY + 42);
+    textSize(18);
+  }
 }
 
-// ============================
-// CLICK TO SPIN
-// ============================
+function drawWalls() {
+  stroke(100, 116, 139);
+  strokeWeight(4);
+  line(board.marginX, 20, board.marginX, board.bottomY);
+  line(board.width - board.marginX, 20, board.width - board.marginX, board.bottomY);
+}
+
+function drawDropArea() {
+  noStroke();
+  fill(56, 189, 248, 45);
+  rect(board.marginX, 20, board.width - board.marginX * 2, 50, 12);
+
+  stroke(125, 211, 252);
+  strokeWeight(2);
+  noFill();
+  rect(board.marginX, 20, board.width - board.marginX * 2, 50, 12);
+
+  noStroke();
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(16);
+  text("Click anywhere here to drop the ball", board.width / 2, 45);
+
+  if (!ballActive && mouseY > 20 && mouseY < 70) {
+    const leftLimit = board.marginX + board.ballRadius;
+    const rightLimit = board.width - board.marginX - board.ballRadius;
+    const previewX = constrain(mouseX, leftLimit, rightLimit);
+
+    fill(250, 204, 21);
+    circle(previewX, board.topDropY, board.ballRadius * 2);
+  }
+}
+
+function drawPegs() {
+  stroke(226, 232, 240);
+  strokeWeight(1.2);
+  fill(148, 163, 184);
+
+  for (let peg of pegs) {
+    circle(peg.x, peg.y, board.pegRadius * 2);
+  }
+}
+
+function drawBall() {
+  if (!ball) return;
+
+  fill(249, 115, 22);
+  stroke(255, 237, 213);
+  strokeWeight(2);
+  circle(ball.x, ball.y, board.ballRadius * 2);
+}
+
+function spawnBallAt(dropX) {
+  if (ballActive) {
+    setMessage("Only one ball can fall at a time.");
+    return;
+  }
+
+  if (bankroll < COST_PER_BALL) {
+    setMessage("Not enough money for another ball.");
+    return;
+  }
+
+  const leftLimit = board.marginX + board.ballRadius;
+  const rightLimit = board.width - board.marginX - board.ballRadius;
+  const clampedX = constrain(dropX, leftLimit, rightLimit);
+
+  bankroll -= COST_PER_BALL;
+  updateUI();
+  setStatus("Ball in play");
+  setMessage(`Dropped ball for $500.`);
+
+  ball = {
+    x: clampedX,
+    y: board.topDropY + 8,
+    vx: 0,
+    vy: 1
+  };
+
+  ballActive = true;
+}
+
+function updateBall() {
+  if (!ball) return;
+
+  ball.vy += board.gravity;
+  ball.vx *= board.friction;
+  ball.vy *= board.friction;
+
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+
+  const leftWall = board.marginX + board.ballRadius;
+  const rightWall = board.width - board.marginX - board.ballRadius;
+
+  if (ball.x < leftWall) {
+    ball.x = leftWall;
+    ball.vx *= -board.wallBounce;
+  }
+
+  if (ball.x > rightWall) {
+    ball.x = rightWall;
+    ball.vx *= -board.wallBounce;
+  }
+
+  for (let peg of pegs) {
+    handlePegCollision(peg);
+  }
+
+  handleSlotWallCollisions();
+
+  if (ball.y >= board.bottomY - board.ballRadius) {
+    ball.y = board.bottomY - board.ballRadius;
+    settleBall();
+  }
+}
+
+function handleSlotWallCollisions() {
+  if (!ball) return;
+
+  const slotWidth = (board.width - board.marginX * 2) / board.slotCount;
+  const wallTop = board.bottomY - board.slotWallHeight;
+  const wallBottom = board.bottomY;
+  const halfThickness = board.slotWallThickness / 2;
+
+  // Only collide with divider walls when the ball is in the bottom slot area
+  if (ball.y + board.ballRadius < wallTop || ball.y - board.ballRadius > wallBottom) {
+    return;
+  }
+
+  for (let i = 1; i < board.slotCount; i++) {
+    const wallX = board.marginX + i * slotWidth;
+
+    const overlapsHorizontally =
+      ball.x + board.ballRadius > wallX - halfThickness &&
+      ball.x - board.ballRadius < wallX + halfThickness;
+
+    if (overlapsHorizontally) {
+      if (ball.x < wallX) {
+        ball.x = wallX - halfThickness - board.ballRadius;
+      } else {
+        ball.x = wallX + halfThickness + board.ballRadius;
+      }
+
+      ball.vx *= -board.slotWallBounce;
+    }
+  }
+}
+
+function handlePegCollision(peg) {
+  const dx = ball.x - peg.x;
+  const dy = ball.y - peg.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const minDistance = board.ballRadius + board.pegRadius;
+
+  if (distance < minDistance && distance > 0) {
+    const nx = dx / distance;
+    const ny = dy / distance;
+    const overlap = minDistance - distance;
+
+    ball.x += nx * overlap;
+    ball.y += ny * overlap;
+
+    const dot = ball.vx * nx + ball.vy * ny;
+    ball.vx = (ball.vx - 2 * dot * nx) * board.bounce;
+    ball.vy = (ball.vy - 2 * dot * ny) * board.bounce;
+
+    ball.vx += (Math.random() - 0.5) * 0.85;
+    if (ball.vy < 0.6) ball.vy = 0.6;
+  }
+}
+
+function settleBall() {
+  const slotWidth = (board.width - board.marginX * 2) / board.slotCount;
+  const relativeX = constrain(ball.x - board.marginX, 0, board.width - board.marginX * 2 - 1);
+  const slotIndex = floor(relativeX / slotWidth);
+  const slot = slots[slotIndex];
+
+  const winnings = Math.round(COST_PER_BALL * slot.multiplier);
+  bankroll += winnings;
+
+  updateUI();
+  setStatus("Pick a drop point");
+
+  if (winnings > 0) {
+    setMessage(`Ball landed in Zone ${slot.index + 1} (${slot.multiplier}x). Won $${winnings}.`);
+  } else {
+    setMessage(`Ball landed in Zone ${slot.index + 1} (${slot.multiplier}x). Lost the drop.`);
+  }
+
+  ball = null;
+  ballActive = false;
+}
 
 function mousePressed() {
-  let d = dist(mouseX, mouseY, width / 2, height / 2);
-
-  // Only spin if clicking button
-  if (d < buttonRadius && !spinning) {
-    spinSpeed = random(0.2, 0.4);
-    spinning = true;
-    selectedIndex = -1;
+  if (mouseY > 20 && mouseY < 90) {
+    spawnBallAt(mouseX);
   }
 }
 
-// ============================
-// DETERMINE WINNER
-// ============================
-
-function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
+function getSlotColor(multiplier) {
+  if (multiplier === 0) return color(239, 68, 68);
+  if (multiplier >= 5) return color(34, 197, 94);
+  if (multiplier >= 3) return color(132, 204, 22);
+  if (multiplier >= 2) return color(245, 158, 11);
+  if (multiplier >= 1) return color(251, 113, 133);
+  return color(100, 116, 139);
 }
 
-function determineWinner() {
-  let sliceAngle = TWO_PI / options.length;
+function updateUI() {
+  document.getElementById("bankroll").textContent =
+    bankroll.toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0
+    });
+}
 
-  // Normalize angle
-  let normalized = angle % TWO_PI;
+function setStatus(text) {
+  document.getElementById("status").textContent = text;
+}
 
-  // Adjust so pointer is at top
-  let index = floor((TWO_PI - normalized) / sliceAngle) % options.length;
-
-  selectedIndex = index;
-
-  let selected = options[index];
-
-  console.log("Selected:", selected.label);
-
-  // ============================
-  // OPEN NEW TAB BASED ON RESULT
-  // ============================
-
-  if (selected.url) {
-    window.open(selected.url, "_blank");
-  }
+function setMessage(text) {
+  document.getElementById("message").textContent = text;
 }
