@@ -108,11 +108,27 @@ let dropperX = 0;
 let dropperDirection = 1;
 let dropperSpeed = 8;
 
+function getDropZoneBounds() {
+  const fullPlayableWidth = board.width - board.marginX * 2;
+  const dropWidth = fullPlayableWidth * 0.5;
+  const dropX = (board.width - dropWidth) / 2;
+
+  return {
+    x: dropX,
+    y: 20,
+    width: dropWidth,
+    height: 50
+  };
+}
+
 function setup() {
   const canvas = createCanvas(board.width, board.height);
   canvas.parent("gameContainer");
   setupBoard();
-  dropperX = board.width / 2;
+
+  const dropZone = getDropZoneBounds();
+  dropperX = dropZone.x + dropZone.width / 2;
+
   updateUI();
 }
 
@@ -170,7 +186,6 @@ function setupBoard() {
     const pegCount = topPegCount + row;
     const y = board.topPegY + row * board.pegSpacingY;
 
-    // Make the triangle widen smoothly toward the bottom
     const rowWidth = map(
       pegCount,
       topPegCount,
@@ -269,8 +284,9 @@ function drawWalls() {
 function updateDropper() {
   if (ballActive || jumpscareActive) return;
 
-  const leftLimit = board.marginX + board.ballRadius;
-  const rightLimit = board.width - board.marginX - board.ballRadius;
+  const dropZone = getDropZoneBounds();
+  const leftLimit = dropZone.x + board.ballRadius;
+  const rightLimit = dropZone.x + dropZone.width - board.ballRadius;
 
   dropperX += dropperDirection * dropperSpeed;
 
@@ -286,16 +302,18 @@ function updateDropper() {
 }
 
 function drawDropArea() {
+  const dropZone = getDropZoneBounds();
+
   noStroke();
   const fillCol = currentThemeColor("dropFill");
   fill(red(fillCol), green(fillCol), blue(fillCol), 45);
-  rect(board.marginX, 20, board.width - board.marginX * 2, 50, 12);
+  rect(dropZone.x, dropZone.y, dropZone.width, dropZone.height, 12);
 
   const strokeCol = currentThemeColor("dropStroke");
   stroke(strokeCol);
   strokeWeight(2);
   noFill();
-  rect(board.marginX, 20, board.width - board.marginX * 2, 50, 12);
+  rect(dropZone.x, dropZone.y, dropZone.width, dropZone.height, 12);
 
   noStroke();
   fill(210 - horrorLevel * 70, 210 - horrorLevel * 80, 210 - horrorLevel * 90);
@@ -309,7 +327,7 @@ function drawDropArea() {
 
     stroke(currentThemeColor("dropStroke"));
     strokeWeight(1.5);
-    line(dropperX, 20, dropperX, 70);
+    line(dropperX, dropZone.y, dropperX, dropZone.y + dropZone.height);
   }
 }
 
@@ -343,8 +361,9 @@ function spawnBallAt(dropX) {
     return;
   }
 
-  const leftLimit = board.marginX + board.ballRadius;
-  const rightLimit = board.width - board.marginX - board.ballRadius;
+  const dropZone = getDropZoneBounds();
+  const leftLimit = dropZone.x + board.ballRadius;
+  const rightLimit = dropZone.x + dropZone.width - board.ballRadius;
   const clampedX = constrain(dropX, leftLimit, rightLimit);
 
   bankroll -= COST_PER_BALL;
@@ -484,7 +503,14 @@ function settleBall() {
 }
 
 function mousePressed() {
-  if (mouseY > 20 && mouseY < 90) {
+  const dropZone = getDropZoneBounds();
+
+  if (
+    mouseY > dropZone.y &&
+    mouseY < dropZone.y + dropZone.height &&
+    mouseX > dropZone.x &&
+    mouseX < dropZone.x + dropZone.width
+  ) {
     if (jumpscareArmed && !jumpscareTriggered && !jumpscareActive) {
       jumpscareArmed = false;
       triggerJumpscare();
@@ -617,7 +643,6 @@ function startGlitchEffect(isRandomReplay = false) {
   if (!glitchVideo) return;
   if (glitchPlaying) return;
 
-  // First-ever unlock
   glitchStarted = true;
   glitchUnlocked = true;
   glitchPlaying = true;
@@ -631,12 +656,10 @@ function startGlitchEffect(isRandomReplay = false) {
   glitchVideo.currentTime = 0;
   glitchVideo.play().catch(() => {});
 
-  // Play only the first 1.5 seconds of the clip
   setTimeout(() => {
     glitchVideo.pause();
   }, 1500);
 
-  // Keep the frozen overlay visible for the rest of the effect
   setTimeout(() => {
     glitchVideo.classList.remove("active");
     glitchPlaying = false;
