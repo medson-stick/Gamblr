@@ -419,12 +419,34 @@ function mousePressed() {
 }
 
 function getSlotColor(multiplier) {
-  if (multiplier === 0) return color(90, 22, 28);
-  if (multiplier >= 5) return color(70, 82, 52);
-  if (multiplier >= 4) return color(82, 78, 48);
-  if (multiplier >= 2) return color(95, 72, 42);
-  if (multiplier >= 1) return color(74, 62, 58);
-  return color(58, 62, 70);
+  let normalCol;
+  let horrorCol;
+
+  if (multiplier === 0) {
+    normalCol = [239, 68, 68];
+    horrorCol = [90, 22, 28];
+  } else if (multiplier >= 5) {
+    normalCol = [34, 197, 94];
+    horrorCol = [70, 82, 52];
+  } else if (multiplier >= 4) {
+    normalCol = [132, 204, 22];
+    horrorCol = [82, 78, 48];
+  } else if (multiplier >= 2) {
+    normalCol = [245, 158, 11];
+    horrorCol = [95, 72, 42];
+  } else if (multiplier >= 1) {
+    normalCol = [251, 113, 133];
+    horrorCol = [74, 62, 58];
+  } else {
+    normalCol = [100, 116, 139];
+    horrorCol = [58, 62, 70];
+  }
+
+  return color(
+    lerp(normalCol[0], horrorCol[0], horrorLevel),
+    lerp(normalCol[1], horrorCol[1], horrorLevel),
+    lerp(normalCol[2], horrorCol[2], horrorLevel)
+  );
 }
 
 function triggerJumpscare() {
