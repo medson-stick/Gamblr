@@ -7,10 +7,9 @@ const board = {
   height: 760,
   marginX: 60,
   topDropY: 50,
-  topPegY: 120,
-  rows: 11,
-  pegSpacingX: 68,
-  pegSpacingY: 48,
+  topPegY: 105,
+  pegSpacingX: 72,
+  pegSpacingY: 34,
   pegRadius: 6,
   ballRadius: 9,
   gravity: 0.18,
@@ -102,18 +101,24 @@ let pegs = [];
 let slots = [];
 let ball = null;
 
+let dropperX = 0;
+let dropperDirection = 1;
+let dropperSpeed = 4;
+
 function setup() {
   const canvas = createCanvas(board.width, board.height);
   canvas.parent("gameContainer");
   setupBoard();
+  dropperX = board.width / 2;
   updateUI();
 }
 
 function draw() {
   tryRandomGlitch();
+  updateDropper();
 
   background(currentThemeColor("bg"));
-  
+
   updateBall();
   drawSlots();
   drawWalls();
@@ -132,6 +137,7 @@ function setupBoard() {
 
   let currentX = board.marginX;
 
+  // Build bottom slots
   for (let i = 0; i < board.slotCount; i++) {
     const slotWidth = totalWidth * (slotWeights[i] / totalWeight);
 
@@ -145,17 +151,39 @@ function setupBoard() {
     currentX += slotWidth;
   }
 
-  const centerX = board.width / 2;
+  // Standard Plinko triangle:
+  // each row adds exactly 1 peg
+  const topPegCount = 3;
+  const bottomPegCount = board.slotCount - 1; // 18 pegs for 19 slots
+  const rowCount = bottomPegCount - topPegCount + 1; // 16 rows
 
-  for (let row = 0; row < board.rows; row++) {
-    const count = 10 + (row % 2);
-    const rowWidth = (count - 1) * board.pegSpacingX;
-    const startX = centerX - rowWidth / 2;
+  board.rows = rowCount;
+
+  const leftBound = board.marginX + board.pegRadius + 4;
+  const rightBound = board.width - board.marginX - board.pegRadius - 4;
+  const maxUsableWidth = rightBound - leftBound;
+
+  for (let row = 0; row < rowCount; row++) {
+    const pegCount = topPegCount + row;
     const y = board.topPegY + row * board.pegSpacingY;
 
-    for (let col = 0; col < count; col++) {
+    // Make the triangle widen smoothly toward the bottom
+    const rowWidth = map(
+      pegCount,
+      topPegCount,
+      bottomPegCount,
+      maxUsableWidth * 0.25,
+      maxUsableWidth * 1.0
+    );
+
+    const spacingX = pegCount > 1 ? rowWidth / (pegCount - 1) : 0;
+    const startX = board.width / 2 - rowWidth / 2;
+
+    for (let col = 0; col < pegCount; col++) {
+      const x = startX + col * spacingX;
+
       pegs.push({
-        x: startX + col * board.pegSpacingX,
+        x: constrain(x, leftBound, rightBound),
         y: y
       });
     }
@@ -235,6 +263,25 @@ function drawWalls() {
   line(board.width - board.marginX, 20, board.width - board.marginX, board.bottomY);
 }
 
+function updateDropper() {
+  if (ballActive || jumpscareActive) return;
+
+  const leftLimit = board.marginX + board.ballRadius;
+  const rightLimit = board.width - board.marginX - board.ballRadius;
+
+  dropperX += dropperDirection * dropperSpeed;
+
+  if (dropperX <= leftLimit) {
+    dropperX = leftLimit;
+    dropperDirection = 1;
+  }
+
+  if (dropperX >= rightLimit) {
+    dropperX = rightLimit;
+    dropperDirection = -1;
+  }
+}
+
 function drawDropArea() {
   noStroke();
   const fillCol = currentThemeColor("dropFill");
@@ -251,15 +298,15 @@ function drawDropArea() {
   fill(210 - horrorLevel * 70, 210 - horrorLevel * 80, 210 - horrorLevel * 90);
   textAlign(CENTER, CENTER);
   textSize(16);
-  text("Click anywhere here to drop the ball", board.width / 2, 45);
+  text("Click to drop the ball", board.width / 2, 45);
 
-  if (!ballActive && mouseY > 20 && mouseY < 70) {
-    const leftLimit = board.marginX + board.ballRadius;
-    const rightLimit = board.width - board.marginX - board.ballRadius;
-    const previewX = constrain(mouseX, leftLimit, rightLimit);
-
+  if (!ballActive) {
     fill(currentThemeColor("previewBall"));
-    circle(previewX, board.topDropY, board.ballRadius * 2);
+    circle(dropperX, board.topDropY, board.ballRadius * 2);
+
+    stroke(currentThemeColor("dropStroke"));
+    strokeWeight(1.5);
+    line(dropperX, 20, dropperX, 70);
   }
 }
 
@@ -441,7 +488,7 @@ function mousePressed() {
       return;
     }
 
-    spawnBallAt(mouseX);
+    spawnBallAt(dropperX);
   }
 }
 
