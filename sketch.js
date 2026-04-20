@@ -170,38 +170,41 @@ function setupBoard() {
     currentX += slotWidth;
   }
 
-  // Standard Plinko triangle:
-  // each row adds exactly 1 peg
-  const topPegCount = 3;
-  const bottomPegCount = board.slotCount - 1; // 18 pegs for 19 slots
-  const rowCount = bottomPegCount - topPegCount + 1; // 16 rows
+  // Standard plinko triangle, but less congested than before
+  const topPegCount = 2;
+  const bottomPegCount = 13;
+  const rowCount = bottomPegCount - topPegCount + 1; // 12 rows
 
   board.rows = rowCount;
 
+  // Keep the last row just above the end zones
+  const topY = board.topPegY;
+  const bottomPegY = board.sinkLineY - 32;
+  const pegSpacingY = (bottomPegY - topY) / (rowCount - 1);
+
   const leftBound = board.marginX + board.pegRadius + 4;
   const rightBound = board.width - board.marginX - board.pegRadius - 4;
-  const maxUsableWidth = rightBound - leftBound;
+  const usableWidth = rightBound - leftBound;
 
   for (let row = 0; row < rowCount; row++) {
     const pegCount = topPegCount + row;
-    const y = board.topPegY + row * board.pegSpacingY;
+    const y = topY + row * pegSpacingY;
 
+    // Normal widening triangle
     const rowWidth = map(
-      pegCount,
-      topPegCount,
-      bottomPegCount,
-      maxUsableWidth * 0.25,
-      maxUsableWidth * 1.0
+      row,
+      0,
+      rowCount - 1,
+      usableWidth * 0.18,
+      usableWidth * 0.92
     );
 
     const spacingX = pegCount > 1 ? rowWidth / (pegCount - 1) : 0;
     const startX = board.width / 2 - rowWidth / 2;
 
     for (let col = 0; col < pegCount; col++) {
-      const x = startX + col * spacingX;
-
       pegs.push({
-        x: constrain(x, leftBound, rightBound),
+        x: startX + col * spacingX,
         y: y
       });
     }
