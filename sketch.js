@@ -26,10 +26,50 @@ const board = {
   slotWallBounce: 0.7
 };
 
+let horrorLevel = 0;
+
+const theme = {
+  bg: [17, 24, 39],
+  bgHorror: [13, 16, 20],
+
+  peg: [148, 163, 184],
+  pegHorror: [104, 108, 116],
+
+  pegStroke: [226, 232, 240],
+  pegStrokeHorror: [130, 122, 122],
+
+  wall: [100, 116, 139],
+  wallHorror: [82, 74, 74],
+
+  divider: [148, 163, 184],
+  dividerHorror: [92, 82, 82],
+
+  dropFill: [56, 189, 248],
+  dropFillHorror: [92, 98, 110],
+
+  dropStroke: [125, 211, 252],
+  dropStrokeHorror: [110, 96, 96],
+
+  previewBall: [250, 204, 21],
+  previewBallHorror: [148, 120, 64],
+
+  ball: [249, 115, 22],
+  ballHorror: [154, 84, 52],
+
+  ballStroke: [255, 237, 213],
+  ballStrokeHorror: [180, 150, 140]
+};
+
 const JUMPSCARE_THRESHOLD = 8102;
+const JUMPSCARE_PENALTY = 624;
+
 let jumpscareTriggered = false;
 let jumpscareActive = false;
 let jumpscareArmed = false;
+
+const scareFlags = {
+  firstThresholdSeen: false
+};
 
 const multipliers = [
   5, 4, 2, 1.5, 1, 0.75, 0.5, 0.25, 0.25,
@@ -57,7 +97,7 @@ function setup() {
 }
 
 function draw() {
-  background(17, 24, 39);
+  background(currentThemeColor("bg"));
 
   updateBall();
   drawSlots();
@@ -112,7 +152,7 @@ function drawSlotWalls() {
   const wallBottom = board.bottomY;
 
   noStroke();
-  fill(148, 163, 184);
+  fill(currentThemeColor("divider"));
 
   for (let i = 1; i < slots.length; i++) {
     const x = slots[i].x;
@@ -163,7 +203,7 @@ function drawSlots() {
 }
 
 function drawWalls() {
-  stroke(100, 116, 139);
+  stroke(currentThemeColor("wall"));
   strokeWeight(4);
   line(board.marginX, 20, board.marginX, board.bottomY);
   line(board.width - board.marginX, 20, board.width - board.marginX, board.bottomY);
@@ -171,16 +211,18 @@ function drawWalls() {
 
 function drawDropArea() {
   noStroke();
-  fill(56, 189, 248, 45);
+  const fillCol = currentThemeColor("dropFill");
+  fill(red(fillCol), green(fillCol), blue(fillCol), 45);
   rect(board.marginX, 20, board.width - board.marginX * 2, 50, 12);
 
-  stroke(125, 211, 252);
+  const strokeCol = currentThemeColor("dropStroke");
+  stroke(strokeCol);
   strokeWeight(2);
   noFill();
   rect(board.marginX, 20, board.width - board.marginX * 2, 50, 12);
 
   noStroke();
-  fill(255);
+  fill(210 - horrorLevel * 70, 210 - horrorLevel * 80, 210 - horrorLevel * 90);
   textAlign(CENTER, CENTER);
   textSize(16);
   text("Click anywhere here to drop the ball", board.width / 2, 45);
@@ -190,15 +232,15 @@ function drawDropArea() {
     const rightLimit = board.width - board.marginX - board.ballRadius;
     const previewX = constrain(mouseX, leftLimit, rightLimit);
 
-    fill(250, 204, 21);
+    fill(currentThemeColor("previewBall"));
     circle(previewX, board.topDropY, board.ballRadius * 2);
   }
 }
 
 function drawPegs() {
-  stroke(226, 232, 240);
+  stroke(currentThemeColor("pegStroke"));
   strokeWeight(1.2);
-  fill(148, 163, 184);
+  fill(currentThemeColor("peg"));
 
   for (let peg of pegs) {
     circle(peg.x, peg.y, board.pegRadius * 2);
@@ -208,8 +250,8 @@ function drawPegs() {
 function drawBall() {
   if (!ball) return;
 
-  fill(249, 115, 22);
-  stroke(255, 237, 213);
+  fill(currentThemeColor("ball"));
+  stroke(currentThemeColor("ballStroke"));
   strokeWeight(2);
   circle(ball.x, ball.y, board.ballRadius * 2);
 }
@@ -342,12 +384,10 @@ function settleBall() {
     }
   }
 
- const winnings = Math.round(COST_PER_BALL * landedSlot.multiplier);
+  const winnings = Math.round(COST_PER_BALL * landedSlot.multiplier);
   bankroll += winnings;
 
-  if (!jumpscareTriggered && !jumpscareArmed && bankroll <= JUMPSCARE_THRESHOLD) {
-    jumpscareArmed = true;
-  }
+  evaluateScareThresholds();
 
   updateUI();
   setStatus("Pick a drop point");
@@ -371,6 +411,7 @@ function mousePressed() {
     if (jumpscareArmed && !jumpscareTriggered && !jumpscareActive) {
       jumpscareArmed = false;
       triggerJumpscare();
+      return;
     }
 
     spawnBallAt(mouseX);
@@ -378,12 +419,12 @@ function mousePressed() {
 }
 
 function getSlotColor(multiplier) {
-  if (multiplier === 0) return color(239, 68, 68);
-  if (multiplier >= 5) return color(34, 197, 94);
-  if (multiplier >= 3) return color(132, 204, 22);
-  if (multiplier >= 2) return color(245, 158, 11);
-  if (multiplier >= 1) return color(251, 113, 133);
-  return color(100, 116, 139);
+  if (multiplier === 0) return color(90, 22, 28);
+  if (multiplier >= 5) return color(70, 82, 52);
+  if (multiplier >= 4) return color(82, 78, 48);
+  if (multiplier >= 2) return color(95, 72, 42);
+  if (multiplier >= 1) return color(74, 62, 58);
+  return color(58, 62, 70);
 }
 
 function triggerJumpscare() {
@@ -395,9 +436,17 @@ function triggerJumpscare() {
   const overlay = document.getElementById("jumpscareOverlay");
   overlay.classList.add("show");
 
+  horrorLevel = 0.65;
+  document.body.classList.add("horror");
+
+  bankroll = Math.max(0, bankroll - JUMPSCARE_PENALTY);
+  updateUI();
+  setMessage(`Something was taken from you. -$${JUMPSCARE_PENALTY}`);
+
   setTimeout(() => {
     overlay.classList.remove("show");
     jumpscareActive = false;
+    setStatus("Pick a drop point");
   }, 700);
 }
 
@@ -416,4 +465,28 @@ function setStatus(text) {
 
 function setMessage(text) {
   document.getElementById("message").textContent = text;
+}
+
+function blendColorPair(normalArr, horrorArr, amount) {
+  return color(
+    lerp(normalArr[0], horrorArr[0], amount),
+    lerp(normalArr[1], horrorArr[1], amount),
+    lerp(normalArr[2], horrorArr[2], amount)
+  );
+}
+
+function evaluateScareThresholds() {
+  if (!scareFlags.firstThresholdSeen && bankroll <= JUMPSCARE_THRESHOLD) {
+    scareFlags.firstThresholdSeen = true;
+    jumpscareArmed = true;
+  }
+
+  // Future threshold examples:
+  // if (!scareFlags.secondThresholdSeen && bankroll <= 7000) {
+  //   scareFlags.secondThresholdSeen = true;
+  // }
+}
+
+function currentThemeColor(key) {
+  return blendColorPair(theme[key], theme[key + "Horror"], horrorLevel);
 }

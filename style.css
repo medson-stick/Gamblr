@@ -80,3 +80,21 @@ canvas {
   height: 100vh;
   object-fit: cover;
 }
+
+body.horror {
+  background: #0d1014;
+  color: #c1b8b4;
+}
+
+body.horror .right,
+body.horror .bank-panel {
+  background: #1b1719;
+  color: #c1b8b4;
+  border-color: #3a2d2f;
+}
+
+body.horror #status,
+body.horror #message,
+body.horror p {
+  color: #9f9491;
+}
