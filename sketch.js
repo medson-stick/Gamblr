@@ -84,17 +84,20 @@ const scareFlags = {
 };
 
 const multipliers = [
-  5, 4, 2, 1.5, 1, 0.75, 0.5, 0.25, 0.25,
+  5, 4, 2, 1.5, 1, 0.75, 0.5, 0.25,
   0,
-  0.25,
+  0,
+  0,
   0.25, 0.5, 0.75, 1, 1.5, 2, 4, 5
 ];
 
 // Larger weights = wider slots
 const slotWeights = [
-  0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.45, 1.6,
+  0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.45,
   1.75,
-  1.6, 1.45, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7
+  1.8,
+  1.75,
+  1.45, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7
 ];
 
 let pegs = [];
@@ -103,7 +106,7 @@ let ball = null;
 
 let dropperX = 0;
 let dropperDirection = 1;
-let dropperSpeed = 4;
+let dropperSpeed = 8;
 
 function setup() {
   const canvas = createCanvas(board.width, board.height);
