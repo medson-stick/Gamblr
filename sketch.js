@@ -26,6 +26,11 @@ const board = {
   slotWallBounce: 0.7
 };
 
+const JUMPSCARE_THRESHOLD = 8102;
+let jumpscareTriggered = false;
+let jumpscareActive = false;
+let jumpscareArmed = false;
+
 const multipliers = [
   5, 4, 2, 1.5, 1, 0.75, 0.5, 0.25, 0.25,
   0,
@@ -337,8 +342,12 @@ function settleBall() {
     }
   }
 
-  const winnings = Math.round(COST_PER_BALL * landedSlot.multiplier);
+ const winnings = Math.round(COST_PER_BALL * landedSlot.multiplier);
   bankroll += winnings;
+
+  if (!jumpscareTriggered && !jumpscareArmed && bankroll <= JUMPSCARE_THRESHOLD) {
+    jumpscareArmed = true;
+  }
 
   updateUI();
   setStatus("Pick a drop point");
@@ -359,6 +368,11 @@ function settleBall() {
 
 function mousePressed() {
   if (mouseY > 20 && mouseY < 90) {
+    if (jumpscareArmed && !jumpscareTriggered && !jumpscareActive) {
+      jumpscareArmed = false;
+      triggerJumpscare();
+    }
+
     spawnBallAt(mouseX);
   }
 }
@@ -370,6 +384,21 @@ function getSlotColor(multiplier) {
   if (multiplier >= 2) return color(245, 158, 11);
   if (multiplier >= 1) return color(251, 113, 133);
   return color(100, 116, 139);
+}
+
+function triggerJumpscare() {
+  if (jumpscareTriggered || jumpscareActive) return;
+
+  jumpscareTriggered = true;
+  jumpscareActive = true;
+
+  const overlay = document.getElementById("jumpscareOverlay");
+  overlay.classList.add("show");
+
+  setTimeout(() => {
+    overlay.classList.remove("show");
+    jumpscareActive = false;
+  }, 700);
 }
 
 function updateUI() {
