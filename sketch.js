@@ -301,7 +301,7 @@ function drawDropArea() {
   fill(210 - horrorLevel * 70, 210 - horrorLevel * 80, 210 - horrorLevel * 90);
   textAlign(CENTER, CENTER);
   textSize(16);
-  text("Click to drop the ball", board.width / 2, 45);
+  text("Click to here to drop the ball", board.width / 2, 45);
 
   if (!ballActive) {
     fill(currentThemeColor("previewBall"));
